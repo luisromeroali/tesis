@@ -390,15 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
     isDbConnected = connected;
     const badge = document.getElementById('dbStatusBadge');
     if (!badge) return;
-    if (connected) {
-      badge.className = 'status-badge in-stock';
-      badge.textContent = 'MySQL: refrigeracion_rufo';
-      badge.title = 'Conectado en tiempo real a MariaDB / MySQL (refrigeracion_rufo)';
-    } else {
-      badge.className = 'status-badge low-stock';
-      badge.textContent = 'Modo Local (Cache)';
-      badge.title = 'Operando con respaldo en memoria local';
-    }
+    badge.style.display = 'none';
   }
 
   /**
@@ -488,34 +480,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const VIEW_META = {
     dashboard: {
-      title: 'Resumen General del Sistema',
-      subtitle: 'Supervisión en tiempo real de inventario, ventas, proveedores y reportes.'
+      title: '¡Bienvenida!',
+      subtitle: ''
     },
     inventario: {
       title: 'Gestión de Inventario',
-      subtitle: 'Control de existencias de productos, precios, ingreso y alertas de agotado.'
+      subtitle: ''
     },
     ventas: {
       title: 'Control de Ventas',
-      subtitle: 'Seguimiento y registro de productos vendidos.'
+      subtitle: ''
     },
     proveedores: {
       title: 'Gestión de Proveedores',
-      subtitle: 'Directorio de proveedores, compras realizadas y cantidad de mercancía recibida.'
+      subtitle: ''
     },
     reportes: {
       title: 'Generación de Reportes',
-      subtitle: 'Informes de inventario, productos más vendidos y compras a proveedores.'
+      subtitle: ''
     },
     seguridad: {
       title: 'Usuarios y Contraseñas',
-      subtitle: 'Administración de usuarios y cambio de contraseñas.'
+      subtitle: ''
     },
     auditoria: {
       title: 'Bitácora de Auditoría y Trazabilidad',
-      subtitle: 'Supervisión jerárquica de operaciones, inicios de sesión y direcciones IP de origen.'
+      subtitle: ''
     }
   };
+
+  // Inicializar fecha formateada en la barra superior
+  const topbarDateText = document.getElementById('topbarDateText');
+  if (topbarDateText) {
+    const dias = ['Dom.', 'Lun.', 'Mar.', 'Mié.', 'Jue.', 'Vie.', 'Sáb.'];
+    const meses = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    const hoy = new Date();
+    const dSemana = dias[hoy.getDay()];
+    const diaNum = String(hoy.getDate()).padStart(2, '0');
+    const mesNombre = meses[hoy.getMonth()];
+    const anio = hoy.getFullYear();
+    topbarDateText.textContent = `${dSemana}, ${diaNum} de ${mesNombre} de ${anio}`;
+  }
 
   function switchView(viewKey) {
     navItems.forEach((btn) => btn.classList.toggle('active', btn.dataset.view === viewKey));
