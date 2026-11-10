@@ -1,11 +1,27 @@
 /**
  * SISTEMA WEB PARA LA GESTIÓN ADMINISTRATIVA - REFRIGERACIÓN RUFO 1, C.A.
  * Módulo: Helper Centralizado de Auditoría y Trazabilidad (Bitácora de Actividad)
- * Función: Registro en segundo plano e invisible para el empleado.
+ * Función: Registro en segundo plano (MySQL + respaldo local), invisible para el empleado.
  */
 
 (function () {
   const STORAGE_KEY = 'rufo_db_relacional_v2';
+  const SESSION_KEY = 'rufo_usuario_sesion';
+
+  function getApiUrl() {
+    const { protocol, hostname, port, pathname } = window.location;
+    if (
+      (protocol === 'http:' || protocol === 'https:') &&
+      (hostname === 'localhost' || hostname === '127.0.0.1') &&
+      (port === '' || port === '80') &&
+      pathname.toLowerCase().includes('/eunices')
+    ) {
+      return 'src/routes/api.php';
+    }
+    return 'http://localhost/Eunices/src/routes/api.php';
+  }
+
+  const API_URL = getApiUrl();
 
   const INITIAL_AUDIT_LOGS = [
     {
@@ -120,7 +136,11 @@
 
   function getActiveUser() {
     try {
-      const stored = sessionStorage.getItem('rufo_active_user') || localStorage.getItem('rufo_active_user');
+      const stored =
+        sessionStorage.getItem('rufo_active_user') ||
+        localStorage.getItem('rufo_active_user') ||
+        sessionStorage.getItem(SESSION_KEY) ||
+        localStorage.getItem(SESSION_KEY);
       if (stored) return JSON.parse(stored);
     } catch (e) {}
     return null;
@@ -155,7 +175,31 @@
   }
 
   /**
-   * Registra un evento en la bitácora de auditoría.
+   * Envía el evento a la tabla `auditoria` en MySQL / MariaDB de forma asíncrona
+   */
+  async function persistAuditToServer(payload) {
+    try {
+      const response = await fetch(`${API_URL}?action=registrar_auditoria`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify({
+          action: 'registrar_auditoria',
+          ...payload
+        })
+      });
+      const data = await response.json();
+      if (response.ok && data.ok && data.db) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data.db));
+        window.dispatchEvent(new CustomEvent('rufo:db-updated', { detail: data.db }));
+      }
+    } catch (err) {
+      // Si el servidor no está disponible, se mantiene el registro en localStorage
+    }
+  }
+
+  /**
+   * Registra un evento en la bitácora de auditoría (MySQL + cache local).
    * Ejecución silenciosa y segura en segundo plano.
    */
   function logEvent({ modulo, accion, detalles, user = null, ip = null }) {
@@ -192,6 +236,17 @@
       // Guardar al inicio para orden cronológico descendente
       db.auditoria.unshift(auditRecord);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+
+      // Sincronizar con la base de datos MySQL en segundo plano
+      persistAuditToServer({
+        id_usuario: auditRecord.id_usuario,
+        usuario: auditRecord.usuario,
+        rol: auditRecord.rol,
+        modulo: auditRecord.modulo,
+        accion: auditRecord.accion,
+        detalles: auditRecord.detalles,
+        ip_origen: auditRecord.ip_origen
+      });
 
       return auditRecord;
     } catch (err) {

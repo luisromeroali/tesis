@@ -2,7 +2,7 @@
 /**
  * SISTEMA WEB PARA LA GESTIÓN ADMINISTRATIVA - REFRIGERACIÓN RUFO 1, C.A.
  * Módulo: Modelo de Acceso a Datos Relacionales (MySQL / MariaDB)
- * Tablas: usuarios, proveedores, productos, compras, ventas
+ * Tablas: usuarios, proveedores, productos, compras, ventas, auditoria
  */
 
 require_once __DIR__ . '/../config/conexion.php';
@@ -83,12 +83,25 @@ class SistemaModel
             $v['id_usuario']        = (int) $v['id_usuario'];
         }
 
+        $auditoria = $this->db->query(
+            "SELECT id_auditoria, id_usuario, usuario, rol, modulo, accion, detalles, ip_origen,
+                    DATE_FORMAT(fecha_hora, '%Y-%m-%d %H:%i:%s') AS fecha_hora
+             FROM auditoria
+             ORDER BY id_auditoria DESC"
+        )->fetchAll();
+
+        foreach ($auditoria as &$a) {
+            $a['id_auditoria'] = (int) $a['id_auditoria'];
+            $a['id_usuario']   = $a['id_usuario'] !== null ? (int) $a['id_usuario'] : null;
+        }
+
         return [
             'usuarios'    => $usuarios,
             'proveedores' => $proveedores,
             'productos'   => $productos,
             'compras'     => $compras,
             'ventas'      => $ventas,
+            'auditoria'   => $auditoria,
         ];
     }
 
@@ -410,12 +423,70 @@ class SistemaModel
     }
 
     /**
+     * Registra un evento en la bitácora de auditoría
+     */
+    public function registrarAuditoria(array $data): array
+    {
+        $idUsuarioRaw = !empty($data['id_usuario']) ? (int) $data['id_usuario'] : null;
+        $idUsuario    = null;
+
+        if ($idUsuarioRaw !== null && $idUsuarioRaw > 0) {
+            $chk = $this->db->prepare("SELECT id_usuario FROM usuarios WHERE id_usuario = :id LIMIT 1");
+            $chk->execute([':id' => $idUsuarioRaw]);
+            if ($chk->fetchColumn()) {
+                $idUsuario = $idUsuarioRaw;
+            }
+        }
+
+        $usuario  = trim((string) ($data['usuario'] ?? 'desconocido'));
+        $rol      = trim((string) ($data['rol'] ?? 'desconocido'));
+        $modulo   = trim((string) ($data['modulo'] ?? 'General'));
+        $accion   = trim((string) ($data['accion'] ?? 'OPERACION'));
+        $detalles = trim((string) ($data['detalles'] ?? ''));
+        $ipOrigen = trim((string) ($data['ip_origen'] ?? ''));
+
+        if ($ipOrigen === '') {
+            $ipOrigen = (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+        }
+
+        $stmt = $this->db->prepare(
+            "INSERT INTO auditoria (id_usuario, usuario, rol, modulo, accion, detalles, ip_origen, fecha_hora)
+             VALUES (:id_usuario, :usuario, :rol, :modulo, :accion, :detalles, :ip_origen, NOW())"
+        );
+        $stmt->execute([
+            ':id_usuario' => $idUsuario,
+            ':usuario'    => $usuario !== '' ? $usuario : 'desconocido',
+            ':rol'        => $rol !== '' ? $rol : 'desconocido',
+            ':modulo'     => $modulo !== '' ? $modulo : 'General',
+            ':accion'     => $accion !== '' ? $accion : 'OPERACION',
+            ':detalles'   => $detalles,
+            ':ip_origen'  => $ipOrigen,
+        ]);
+
+        $newId = (int) $this->db->lastInsertId();
+        $rowStmt = $this->db->prepare(
+            "SELECT id_auditoria, id_usuario, usuario, rol, modulo, accion, detalles, ip_origen,
+                    DATE_FORMAT(fecha_hora, '%Y-%m-%d %H:%i:%s') AS fecha_hora
+             FROM auditoria
+             WHERE id_auditoria = :id"
+        );
+        $rowStmt->execute([':id' => $newId]);
+        $row = $rowStmt->fetch() ?: [];
+        if ($row) {
+            $row['id_auditoria'] = (int) $row['id_auditoria'];
+            $row['id_usuario']   = $row['id_usuario'] !== null ? (int) $row['id_usuario'] : null;
+        }
+        return $row;
+    }
+
+    /**
      * Restaura los datos iniciales de fábrica en la base de datos refrigeracion_rufo
      */
     public function restaurarDatosIniciales(): void
     {
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 0");
         try {
+            $this->db->exec("TRUNCATE TABLE auditoria");
             $this->db->exec("TRUNCATE TABLE ventas");
             $this->db->exec("TRUNCATE TABLE compras");
             $this->db->exec("TRUNCATE TABLE productos");
@@ -462,6 +533,19 @@ class SistemaModel
                 (3, '2026-11-08 10:42:00', 'Venta de compresor con garantía', 3, 285.00, 1, 1),
                 (4, '2026-11-08 11:20:00', 'Venta al detal en mostrador', 6, 111.00, 5, 2),
                 (5, '2026-11-08 11:55:00', 'Venta de cilindro refrigerante', 2, 270.00, 2, 1)"
+            );
+
+            $this->db->exec(
+                "INSERT INTO `auditoria` (`id_auditoria`, `id_usuario`, `usuario`, `rol`, `modulo`, `accion`, `detalles`, `ip_origen`, `fecha_hora`) VALUES
+                (1, 1, 'admin', 'administrador', 'Sistema', 'INICIALIZACION_SISTEMA', 'Carga de estructura base de base de datos relacional y catálogo de repuestos', '192.168.1.10', '2026-11-01 08:00:00'),
+                (2, 1, 'admin', 'administrador', 'Autenticación', 'INICIO_SESION', 'Inicio de sesión exitoso en estación de gerencia', '192.168.1.10', '2026-11-08 08:30:00'),
+                (3, 2, 'empleado', 'empleado', 'Autenticación', 'INICIO_SESION', 'Inicio de sesión de operador en terminal de mostrador', '192.168.1.105', '2026-11-08 09:00:00'),
+                (4, 2, 'empleado', 'empleado', 'Ventas', 'REGISTRO_VENTA', 'Venta #1 registrada: 12x Capacitor de Marcha 35 uF ($78.00)', '192.168.1.105', '2026-11-08 09:15:00'),
+                (5, 2, 'empleado', 'empleado', 'Ventas', 'REGISTRO_VENTA', 'Venta #2 registrada: 9x Protector Térmico y Relé PTC 1/3 HP ($45.00)', '192.168.1.105', '2026-11-08 10:05:00'),
+                (6, 1, 'admin', 'administrador', 'Ventas', 'REGISTRO_VENTA', 'Venta #3 registrada: 3x Compresor Embraco 1/4 HP R-134a ($285.00)', '192.168.1.10', '2026-11-08 10:42:00'),
+                (7, 2, 'empleado', 'empleado', 'Ventas', 'REGISTRO_VENTA', 'Venta #4 registrada: 6x Motor Ventilador Evaporador 110V ($111.00)', '192.168.1.105', '2026-11-08 11:20:00'),
+                (8, 1, 'admin', 'administrador', 'Ventas', 'REGISTRO_VENTA', 'Venta #5 registrada: 2x Cilindro Gas Refrigerante R-134a ($270.00)', '192.168.1.10', '2026-11-08 11:55:00'),
+                (9, 2, 'empleado', 'empleado', 'Seguridad', 'ACCESO_DENEGADO', 'Intento de ingreso no autorizado a la ruta /admin.html bloqueado por directiva de seguridad', '192.168.1.105', '2026-11-08 13:10:00')"
             );
         } finally {
             $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");

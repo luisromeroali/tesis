@@ -28,7 +28,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function checkSession() {
     let activeUser = null;
     try {
-      const stored = sessionStorage.getItem('rufo_active_user') || localStorage.getItem('rufo_active_user');
+      const stored =
+        sessionStorage.getItem('rufo_active_user') ||
+        localStorage.getItem('rufo_active_user') ||
+        sessionStorage.getItem(SESSION_KEY) ||
+        localStorage.getItem(SESSION_KEY);
       if (stored) activeUser = JSON.parse(stored);
     } catch (e) {}
 
@@ -83,6 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       localStorage.removeItem('rufo_active_user');
       sessionStorage.removeItem('rufo_active_user');
+      localStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem(SESSION_KEY);
       window.location.href = 'index.html';
     });
   });
@@ -335,8 +341,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getActiveSessionUser() {
+    if (currentUser) return currentUser;
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+      const raw =
+        sessionStorage.getItem('rufo_active_user') ||
+        localStorage.getItem('rufo_active_user') ||
+        sessionStorage.getItem(SESSION_KEY) ||
+        localStorage.getItem(SESSION_KEY);
       if (raw) return JSON.parse(raw);
     } catch (err) {
       // Ignorar errores de parseo
@@ -1594,6 +1605,13 @@ document.addEventListener('DOMContentLoaded', () => {
         detalles: 'Base de datos restaurada a valores de fábrica por el Administrador',
         user: currentUser
       });
+    }
+  });
+
+  window.addEventListener('rufo:db-updated', (e) => {
+    if (e.detail && typeof e.detail === 'object') {
+      db = e.detail;
+      renderAuditoria();
     }
   });
 

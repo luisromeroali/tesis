@@ -113,6 +113,15 @@ class SistemaController
                     'db'         => $this->model->obtenerTodo(),
                 ];
 
+            case 'registrar_auditoria':
+                $registro = $this->model->registrarAuditoria($payload);
+                return [
+                    'ok'       => true,
+                    'registro' => $registro,
+                    'mensaje'  => 'Evento de auditoría registrado.',
+                    'db'       => $this->model->obtenerTodo(),
+                ];
+
             case 'restaurar_datos':
                 $this->model->restaurarDatosIniciales();
                 return [

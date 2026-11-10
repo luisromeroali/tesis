@@ -2,10 +2,28 @@
  * SISTEMA WEB PARA LA GESTIÓN ADMINISTRATIVA - REFRIGERACIÓN RUFO 1, C.A.
  * Módulo: Controlador del Panel de Empleado (Acceso Limitado y Supervisado)
  * Funcionalidad: Registro Diario de Ventas e Inmutabilidad de Registros Históricos
+ * Conectado a la Base de Datos MySQL / MariaDB (refrigeracion_rufo)
  */
 
 document.addEventListener('DOMContentLoaded', () => {
   const STORAGE_KEY = 'rufo_db_relacional_v2';
+  const SESSION_KEY = 'rufo_usuario_sesion';
+
+  function getApiUrl() {
+    const { protocol, hostname, port, pathname } = window.location;
+    if (
+      (protocol === 'http:' || protocol === 'https:') &&
+      (hostname === 'localhost' || hostname === '127.0.0.1') &&
+      (port === '' || port === '80') &&
+      pathname.toLowerCase().includes('/eunices')
+    ) {
+      return 'src/routes/api.php';
+    }
+    return 'http://localhost/Eunices/src/routes/api.php';
+  }
+
+  const API_URL = getApiUrl();
+  let isDbConnected = false;
 
   // ==========================================================================
   // 1. Verificación de Autenticación y Control de Roles
@@ -13,7 +31,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function checkSession() {
     let activeUser = null;
     try {
-      const stored = sessionStorage.getItem('rufo_active_user') || localStorage.getItem('rufo_active_user');
+      const stored =
+        sessionStorage.getItem('rufo_active_user') ||
+        localStorage.getItem('rufo_active_user') ||
+        sessionStorage.getItem(SESSION_KEY) ||
+        localStorage.getItem(SESSION_KEY);
       if (stored) activeUser = JSON.parse(stored);
     } catch (e) {
       console.error('Error al leer sesión activa:', e);
@@ -293,6 +315,57 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
   }
 
+  function updateConnectionBadge(connected) {
+    isDbConnected = connected;
+    const badge = document.getElementById('dbStatusBadge');
+    if (!badge) return;
+    if (connected) {
+      badge.className = 'status-badge in-stock';
+      badge.textContent = 'MySQL: refrigeracion_rufo';
+      badge.title = 'Conectado en tiempo real a MariaDB / MySQL (refrigeracion_rufo)';
+    } else {
+      badge.className = 'status-badge low-stock';
+      badge.textContent = 'Modo Local (Cache)';
+      badge.title = 'Operando con respaldo en memoria local';
+    }
+  }
+
+  async function apiRequest(action, payload = {}) {
+    const response = await fetch(`${API_URL}?action=${encodeURIComponent(action)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...payload })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.mensaje || 'Error al procesar la operación en la base de datos.');
+    }
+    if (data.db) {
+      db = data.db;
+      saveDb();
+    }
+    updateConnectionBadge(true);
+    return data;
+  }
+
+  async function syncWithDatabase() {
+    try {
+      const response = await fetch(`${API_URL}?action=init`);
+      const data = await response.json();
+      if (response.ok && data.ok && data.db) {
+        db = data.db;
+        saveDb();
+        updateConnectionBadge(true);
+        renderDailySales();
+        renderCatalog();
+      } else {
+        updateConnectionBadge(false);
+      }
+    } catch (err) {
+      updateConnectionBadge(false);
+    }
+  }
+
   function getProductoById(id_producto) {
     return db.productos.find((p) => Number(p.id_producto) === Number(id_producto));
   }
@@ -310,6 +383,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  function getLocalDateTimeMinutes() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
   }
 
   // ==========================================================================
@@ -395,6 +474,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       localStorage.removeItem('rufo_active_user');
       sessionStorage.removeItem('rufo_active_user');
+      localStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem(SESSION_KEY);
       window.location.href = 'index.html';
     });
   });
@@ -628,9 +709,8 @@ document.addEventListener('DOMContentLoaded', () => {
     stockUnitsDisplay.textContent = 'Seleccione un repuesto';
     stockUnitsDisplay.className = 'stock-ok';
 
-    // Fecha bloqueada con fecha y hora actual
-    const now = new Date();
-    const formattedDate = now.toISOString().slice(0, 16).replace('T', ' ');
+    // Fecha bloqueada con fecha y hora actual (local)
+    const formattedDate = getLocalDateTimeMinutes();
     saleDateLocked.value = `${formattedDate} (Hoy)`;
 
     dailySaleModal.classList.add('open');
@@ -697,7 +777,7 @@ document.addEventListener('DOMContentLoaded', () => {
   saleQuantityInput?.addEventListener('input', recalculateSale);
 
   // Envío del Formulario de Venta
-  dailySaleForm?.addEventListener('submit', (e) => {
+  dailySaleForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const productId = parseInt(saleProductSelect.value, 10);
@@ -728,45 +808,54 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // 1. Descontar stock del producto en el inventario
-    prod.cantidad = Math.max(0, Number(prod.cantidad) - qty);
+    const saleAmount = Number((Number(prod.precio) * qty).toFixed(2));
+    let registeredSaleId = null;
 
-    // 2. Generar registro de venta con fecha y hora actual
-    const now = new Date();
-    const dateFormatted = now.toISOString().slice(0, 16).replace('T', ' ');
-    const maxId = db.ventas.reduce((m, v) => Math.max(m, Number(v.id_venta)), 0);
-
-    const saleRecord = {
-      id_venta: maxId + 1,
-      fecha: dateFormatted,
-      id_producto: productId,
-      cantidad_producto: qty,
-      monto: Number((Number(prod.precio) * qty).toFixed(2)),
-      descripcion: desc,
-      id_usuario: Number(currentUser.id_usuario || 2)
-    };
-
-    // Agregar la nueva venta al inicio del registro
-    db.ventas.unshift(saleRecord);
-
-    // 3. Persistir en la base de datos relacional
-    saveDb();
+    try {
+      const res = await apiRequest('registrar_venta', {
+        id_producto: productId,
+        cantidad_producto: qty,
+        descripcion: desc,
+        id_usuario: Number(currentUser.id_usuario || 2)
+      });
+      registeredSaleId = res.id_venta;
+    } catch (err) {
+      if (!isDbConnected) {
+        // Fallback local si el servidor no responde
+        prod.cantidad = Math.max(0, Number(prod.cantidad) - qty);
+        const maxId = db.ventas.reduce((m, v) => Math.max(m, Number(v.id_venta)), 0);
+        registeredSaleId = maxId + 1;
+        db.ventas.unshift({
+          id_venta: registeredSaleId,
+          fecha: getLocalDateTimeMinutes(),
+          id_producto: productId,
+          cantidad_producto: qty,
+          monto: saleAmount,
+          descripcion: desc,
+          id_usuario: Number(currentUser.id_usuario || 2)
+        });
+        saveDb();
+      } else {
+        showToast(err.message);
+        return;
+      }
+    }
 
     // Registro silencioso en Bitácora de Auditoría (Trazabilidad)
     if (window.RufoAudit) {
       window.RufoAudit.logEvent({
         modulo: 'Ventas',
         accion: 'REGISTRO_VENTA',
-        detalles: `Venta #${saleRecord.id_venta} registrada: ${qty}x ${prod.nombre} (Cód: ${prod.codigo}) por ${formatMoney(saleRecord.monto)}`,
+        detalles: `Venta #${registeredSaleId} registrada: ${qty}x ${prod.nombre} (Cód: ${prod.codigo}) por ${formatMoney(saleAmount)}`,
         user: currentUser
       });
     }
 
-    // 4. Actualizar vistas y mostrar confirmación
+    // Actualizar vistas y mostrar confirmación
     closeSaleModal();
     renderDailySales();
     renderCatalog();
-    showToast(`Venta #${saleRecord.id_venta} registrada con éxito. Stock actualizado.`);
+    showToast(`Venta #${registeredSaleId} registrada con éxito. Stock actualizado.`);
   });
 
   // ==========================================================================
@@ -777,7 +866,8 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('Restricción de seguridad: Los registros históricos están protegidos.');
   });
 
-  // Render inicial de todo el módulo
+  // Render inicial y sincronización con MySQL / MariaDB
   renderDailySales();
   renderCatalog();
+  syncWithDatabase();
 });
