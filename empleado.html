@@ -18,13 +18,14 @@
 <body>
   <div class="app-shell">
     <!-- ======================================================================
-         SIDEBAR DE NAVEGACIÓN DEL EMPLEADO (#04105a)
+         SIDEBAR DE NAVEGACIÓN DEL EMPLEADO (DISEÑO FLOTANTE CREMA)
          ====================================================================== -->
     <aside id="sidebar" class="sidebar" aria-label="Menú principal del empleado">
       <div class="sidebar-brand">
         <div class="sidebar-logo-box">
           <img src="src/assets/logo.jpg" alt="Logo Refrigeración Rufo" />
         </div>
+        <div class="sidebar-brand-title">Sistema de Inventario</div>
         <div class="sidebar-system-tag">
           <span>Gestión Administrativa</span>
           <span class="role-chip role-empleado">Empleado</span>
@@ -69,19 +70,32 @@
         </div>
         <a href="index.html" class="logout-btn" id="empLogoutBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" x2="9" y1="12" y2="12"/>
+            <path d="M15 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" x2="3" y1="12" y2="12"/>
           </svg>
           <span>Cerrar Sesión</span>
         </a>
       </div>
+
+      <!-- Ondas decorativas inferiores del Sidebar -->
+      <svg class="sidebar-bottom-wave" viewBox="0 0 240 70" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 28 C65 36, 130 58, 200 70 L0 70 Z" fill="#ebd9c0" opacity="0.65"/>
+        <path d="M0 15 C45 30, 88 58, 128 70 L0 70 Z" fill="#081b4b"/>
+      </svg>
     </aside>
 
     <!-- ======================================================================
          ÁREA DE CONTENIDO PRINCIPAL
          ====================================================================== -->
     <div class="main-area">
+      <!-- Ondas decorativas superiores del fondo -->
+      <svg class="canvas-top-waves" viewBox="0 0 900 130" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M180 0 C260 65, 420 95, 620 40 C740 8, 830 0, 900 0 Z" fill="#ebdecb" opacity="0.65"/>
+        <path d="M390 0 C430 68, 560 112, 740 82 C820 68, 870 30, 900 0 Z" fill="#bfd6f6" opacity="0.75"/>
+        <path d="M465 0 C535 52, 650 62, 790 0 Z" fill="#081b4b"/>
+      </svg>
+
       <!-- Barra Superior -->
       <header class="topbar">
         <div class="topbar-left">
@@ -93,27 +107,37 @@
             </svg>
           </button>
           <div class="page-heading">
-            <h1 id="empTopbarTitle">Registro Diario de Operaciones</h1>
-            <p id="empTopbarSubtitle">Interfaz exclusiva para el ingreso y supervisión de ventas del día a día.</p>
+            <h1 id="empTopbarTitle">¡Bienvenida!</h1>
+            <p id="empTopbarSubtitle" class="sr-only"></p>
           </div>
         </div>
 
         <div class="topbar-right">
-          <span id="dbStatusBadge" class="status-badge in-stock" title="Conexión activa con la base de datos MySQL / MariaDB">
-            MySQL: refrigeracion_rufo
-          </span>
+          <span id="dbStatusBadge" class="sr-only"></span>
+
+          <div class="date-pill" title="Fecha del sistema">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <span id="empTopbarDateText">Sáb., 01 de Noviembre de 2026</span>
+          </div>
 
           <div class="security-badge-pill" title="Perfil con acceso limitado y supervisión activa">
             <span class="pulse-dot"></span>
             <span>Acceso Supervisado</span>
           </div>
 
-          <div class="company-pill">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-              <circle cx="12" cy="10" r="3"/>
-            </svg>
-            <span>Refrigeración Rufo 1, C.A. • Cabimas</span>
+          <div class="topbar-divider" aria-hidden="true"></div>
+
+          <div class="topbar-user-profile" title="Perfil de Operador">
+            <div class="topbar-user-circle">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5Zm0 2.5c-3.34 0-10 1.67-10 5V22h20v-2.5c0-3.33-6.66-5-10-5Z"/>
+              </svg>
+            </div>
           </div>
         </div>
       </header>
@@ -149,61 +173,58 @@
              ================================================================== -->
         <section id="view-diario" class="module-view active">
           <!-- KPIs de la Jornada Actual -->
-          <div class="kpi-grid">
-            <div class="kpi-card">
-              <div class="kpi-top">
-                <span class="kpi-label">Ventas Cobradas Hoy</span>
-                <div class="kpi-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" x2="12" y1="2" y2="22"/>
-                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                  </svg>
-                </div>
+          <div class="kpi-grid hero-kpi-grid">
+            <div class="kpi-card hero-kpi-card kpi-theme-navy">
+              <div class="hero-kpi-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" x2="12" y1="2" y2="22"/>
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
               </div>
-              <div id="kpiTodayRevenue" class="kpi-value">$0.00</div>
-              <div id="kpiTodayDate" class="kpi-sub">Jornada en curso</div>
+              <div class="hero-kpi-body">
+                <div id="kpiTodayRevenue" class="kpi-value">$0.00</div>
+                <div class="kpi-label">Ventas Cobradas Hoy</div>
+                <div id="kpiTodayDate" class="kpi-sub sr-only"></div>
+              </div>
             </div>
 
-            <div class="kpi-card">
-              <div class="kpi-top">
-                <span class="kpi-label">Repuestos Vendidos Hoy</span>
-                <div class="kpi-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
-                    <path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
-                  </svg>
-                </div>
+            <div class="kpi-card hero-kpi-card kpi-theme-peach">
+              <div class="hero-kpi-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                  <path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
+                </svg>
               </div>
-              <div id="kpiTodayUnits" class="kpi-value">0</div>
-              <div class="kpi-sub">Unidades despachadas</div>
+              <div class="hero-kpi-body">
+                <div id="kpiTodayUnits" class="kpi-value">0</div>
+                <div class="kpi-label">Repuestos Vendidos Hoy</div>
+              </div>
             </div>
 
-            <div class="kpi-card">
-              <div class="kpi-top">
-                <span class="kpi-label">Operaciones Registradas</span>
-                <div class="kpi-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/>
-                    <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>
-                  </svg>
-                </div>
+            <div class="kpi-card hero-kpi-card kpi-theme-sky">
+              <div class="hero-kpi-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/>
+                  <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>
+                </svg>
               </div>
-              <div id="kpiTodayCount" class="kpi-value">0</div>
-              <div class="kpi-sub">Transacciones de mostrador</div>
+              <div class="hero-kpi-body">
+                <div id="kpiTodayCount" class="kpi-value">0</div>
+                <div class="kpi-label">Operaciones Registradas</div>
+              </div>
             </div>
 
-            <div class="kpi-card">
-              <div class="kpi-top">
-                <span class="kpi-label">Operador en Turno</span>
-                <div class="kpi-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
-                    <circle cx="12" cy="7" r="4"/>
-                  </svg>
-                </div>
+            <div class="kpi-card hero-kpi-card kpi-theme-peach">
+              <div class="hero-kpi-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
               </div>
-              <div id="kpiOperatorName" class="kpi-value" style="font-size: 1.15rem; line-height: 1.3;">Empleado</div>
-              <div class="kpi-sub">Registro vinculado a su ID</div>
+              <div class="hero-kpi-body">
+                <div id="kpiOperatorName" class="kpi-value" style="font-size: 1.25rem;">Empleado</div>
+                <div class="kpi-label">Operador en Turno</div>
+              </div>
             </div>
           </div>
 
@@ -212,7 +233,6 @@
             <div class="panel-header">
               <div class="panel-title-group">
                 <h2 id="salesTableTitle">Operaciones y Ventas del Día</h2>
-                <p id="salesTableSubtitle">Lista de transacciones registradas durante la jornada de hoy</p>
               </div>
               <button type="button" id="openNewSaleBtn" class="btn btn-primary">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -224,17 +244,17 @@
             </div>
 
             <!-- Selector de Modo: Registro Diario vs Histórico Pasado -->
-            <div style="display: flex; gap: 8px; padding: 0 20px 14px; border-bottom: 1px solid var(--border-light); flex-wrap: wrap;">
-              <button type="button" class="btn btn-sm btn-primary" id="modeTodayBtn">
+            <div style="display: flex; gap: 8px; padding: 12px 22px; border-bottom: 1px solid var(--border-light); flex-wrap: wrap; background-color: var(--bg-surface);">
+              <button type="button" class="filter-pill-btn active" id="modeTodayBtn">
                 Jornada de Hoy (Registro Diario)
               </button>
-              <button type="button" class="btn btn-sm btn-secondary" id="modeHistoryBtn">
+              <button type="button" class="filter-pill-btn" id="modeHistoryBtn">
                 Historial Pasado (Solo Lectura)
               </button>
             </div>
 
             <!-- Filtros y Búsqueda -->
-            <div class="filter-toolbar">
+            <div class="toolbar filter-toolbar">
               <div class="search-box">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/>
@@ -242,13 +262,14 @@
                 <input
                   type="text"
                   id="searchTodaySalesInput"
-                  placeholder="Buscar en operaciones de hoy por repuesto, código o descripción..."
+                  class="search-input"
+                  placeholder="Buscar en operaciones por repuesto, código o descripción..."
                 />
               </div>
             </div>
 
             <div class="table-responsive">
-              <table class="data-table">
+              <table class="data-table movements-table">
                 <thead>
                   <tr>
                     <th># Venta</th>
@@ -288,7 +309,6 @@
             <div class="panel-header">
               <div class="panel-title-group">
                 <h2>Catálogo de Repuestos y Precios (Solo Lectura)</h2>
-                <p>Verifique existencias disponibles en almacén y precios oficiales vigentes para cotización en mostrador</p>
               </div>
               <div class="badge-readonly">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -300,7 +320,7 @@
             </div>
 
             <!-- Filtros de Búsqueda de Productos -->
-            <div class="filter-toolbar">
+            <div class="toolbar filter-toolbar">
               <div class="search-box">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/>
@@ -308,13 +328,14 @@
                 <input
                   type="text"
                   id="searchInventoryInput"
+                  class="search-input"
                   placeholder="Buscar repuestos por código, nombre o categoría..."
                 />
               </div>
             </div>
 
             <div class="table-responsive">
-              <table class="data-table">
+              <table class="data-table movements-table">
                 <thead>
                   <tr>
                     <th>Código</th>
@@ -336,6 +357,112 @@
       </main>
     </div>
   </div>
+
+  <!-- ======================================================================
+       MODAL: REGISTRAR OPERACIÓN / VENTA DEL DÍA
+       ====================================================================== -->
+  <div id="dailySaleModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dailySaleModalTitle">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="dailySaleModalTitle">Registrar Venta del Día en Mostrador</h3>
+        <button type="button" class="modal-close-x" id="closeDailySaleX" aria-label="Cerrar modal">&times;</button>
+      </div>
+
+      <form id="dailySaleForm">
+        <div class="modal-body">
+          <!-- Campo: Producto / Repuesto -->
+          <div class="field-group">
+            <label for="saleProductSelect">Repuesto / Producto *</label>
+            <select id="saleProductSelect" class="field-input" required>
+              <option value="">-- Seleccione un repuesto --</option>
+            </select>
+            <div class="field-hint-stock">
+              <span id="stockStatusLabel">Disponibilidad en almacén:</span>
+              <strong id="stockUnitsDisplay" class="stock-ok">--</strong>
+            </div>
+          </div>
+
+          <!-- Fila de Cantidad y Precio Unitario -->
+          <div class="form-row-2">
+            <div class="field-group">
+              <label for="saleQuantityInput">Cantidad a Vender *</label>
+              <input
+                type="number"
+                id="saleQuantityInput"
+                class="field-input"
+                min="1"
+                value="1"
+                required
+              />
+            </div>
+
+            <div class="field-group">
+              <label for="saleUnitPriceInput">Precio Unitario ($) [Oficial]</label>
+              <input
+                type="text"
+                id="saleUnitPriceInput"
+                class="field-input mono"
+                value="0.00"
+                readonly
+                title="Precio fijado en el sistema por el Administrador"
+              />
+            </div>
+          </div>
+
+          <!-- Total a Cobrar Dinámico -->
+          <div class="sale-calc-box">
+            <span class="sale-calc-label">Total a Cobrar:</span>
+            <span id="saleTotalAmountDisplay" class="sale-calc-amount">$0.00</span>
+          </div>
+
+          <!-- Detalle / Comprobante -->
+          <div class="field-group">
+            <label for="saleDescriptionInput">Detalle u Observación de la Venta</label>
+            <input
+              type="text"
+              id="saleDescriptionInput"
+              class="field-input"
+              placeholder="Ej. Venta en mostrador, cliente particular"
+              value="Venta al detal en mostrador"
+            />
+          </div>
+
+          <!-- Fecha de la Operación (Fijada a la jornada actual) -->
+          <div class="field-group">
+            <label for="saleDateLocked">Fecha de la Operación (Automática)</label>
+            <input
+              type="text"
+              id="saleDateLocked"
+              class="field-input"
+              readonly
+              title="La fecha se establece automáticamente al registrar la venta del día"
+            />
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="cancelSaleBtn">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="confirmSaleBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <span>Confirmar e Ingresar Venta</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notificación Toast Flotante -->
+  <div id="toastNotification" class="toast-notification" role="status" aria-live="polite"></div>
+
+  <!-- Subsistema de Auditoría en Segundo Plano (Invisible para el Operador) -->
+  <script src="src/assets/js/audit.js"></script>
+
+  <!-- Lógica Operativa del Empleado -->
+  <script src="src/assets/js/empleado.js"></script>
+</body>
+</html>
 
   <!-- ======================================================================
        MODAL: REGISTRAR OPERACIÓN / VENTA DEL DÍA

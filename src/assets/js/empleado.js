@@ -319,15 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
     isDbConnected = connected;
     const badge = document.getElementById('dbStatusBadge');
     if (!badge) return;
-    if (connected) {
-      badge.className = 'status-badge in-stock';
-      badge.textContent = 'MySQL: refrigeracion_rufo';
-      badge.title = 'Conectado en tiempo real a MariaDB / MySQL (refrigeracion_rufo)';
-    } else {
-      badge.className = 'status-badge low-stock';
-      badge.textContent = 'Modo Local (Cache)';
-      badge.title = 'Operando con respaldo en memoria local';
-    }
+    badge.style.display = 'none';
   }
 
   async function apiRequest(action, payload = {}) {
@@ -415,14 +407,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const topbarTitle = document.getElementById('empTopbarTitle');
   const topbarSubtitle = document.getElementById('empTopbarSubtitle');
 
+  // Inicializar fecha formateada en barra superior
+  const empTopbarDateText = document.getElementById('empTopbarDateText');
+  if (empTopbarDateText) {
+    const now = new Date();
+    const options = { weekday: 'short', day: '2-digit', month: 'long', year: 'numeric' };
+    const dateFormatted = now.toLocaleDateString('es-ES', options);
+    empTopbarDateText.textContent = dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1);
+  }
+
   const VIEW_TITLES = {
     diario: {
-      title: 'Registro Diario de Operaciones',
-      subtitle: 'Interfaz exclusiva para el ingreso y supervisión de ventas del día a día.'
+      title: '¡Bienvenida!',
+      subtitle: ''
     },
     'inventario-consulta': {
-      title: 'Consulta de Inventario de Repuestos (Solo Lectura)',
-      subtitle: 'Verifique disponibilidad en tiempo real y precios oficiales para atención en mostrador.'
+      title: 'Consulta de Inventario',
+      subtitle: ''
     }
   };
 
@@ -436,8 +437,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (VIEW_TITLES[viewKey]) {
-      topbarTitle.textContent = VIEW_TITLES[viewKey].title;
-      topbarSubtitle.textContent = VIEW_TITLES[viewKey].subtitle;
+      if (topbarTitle) topbarTitle.textContent = VIEW_TITLES[viewKey].title;
+      if (topbarSubtitle) {
+        topbarSubtitle.textContent = VIEW_TITLES[viewKey].subtitle;
+        topbarSubtitle.style.display = VIEW_TITLES[viewKey].subtitle ? 'block' : 'none';
+      }
     }
 
     // Cerrar sidebar en dispositivos móviles
@@ -501,19 +505,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   modeTodayBtn?.addEventListener('click', () => {
     currentSalesMode = 'today';
-    modeTodayBtn.className = 'btn btn-sm btn-primary';
-    modeHistoryBtn.className = 'btn btn-sm btn-secondary';
+    modeTodayBtn.className = 'filter-pill-btn active';
+    modeHistoryBtn.className = 'filter-pill-btn';
     if (salesTableTitle) salesTableTitle.textContent = 'Operaciones y Ventas del Día';
-    if (salesTableSubtitle) salesTableSubtitle.textContent = 'Lista de transacciones registradas durante la jornada de hoy';
+    if (salesTableSubtitle) {
+      salesTableSubtitle.textContent = '';
+      salesTableSubtitle.style.display = 'none';
+    }
     renderDailySales();
   });
 
   modeHistoryBtn?.addEventListener('click', () => {
     currentSalesMode = 'history';
-    modeTodayBtn.className = 'btn btn-sm btn-secondary';
-    modeHistoryBtn.className = 'btn btn-sm btn-primary';
-    if (salesTableTitle) salesTableTitle.textContent = 'Historial de Ventas Pasadas (Solo Lectura)';
-    if (salesTableSubtitle) salesTableSubtitle.textContent = 'Registros históricos protegidos contra modificaciones según políticas de seguridad contable';
+    modeTodayBtn.className = 'filter-pill-btn';
+    modeHistoryBtn.className = 'filter-pill-btn active';
+    if (salesTableTitle) salesTableTitle.textContent = 'Historial de Ventas Pasadas';
+    if (salesTableSubtitle) {
+      salesTableSubtitle.textContent = '';
+      salesTableSubtitle.style.display = 'none';
+    }
     renderDailySales();
   });
 
