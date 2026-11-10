@@ -1,0 +1,180 @@
+/* ==========================================================================
+   SISTEMA WEB PARA LA GESTIÓN ADMINISTRATIVA - REFRIGERACIÓN RUFO 1, C.A.
+   Módulo: Panel del Empleado (Acceso Limitado y Supervisado)
+   Estilos específicos complementarios a admin.css
+   ========================================================================== */
+
+/* Distintivo de Rol de Empleado */
+.role-chip.role-empleado {
+  background-color: rgba(30, 68, 200, 0.25);
+  border-color: var(--blue-400);
+  color: #ffffff;
+}
+
+/* Banner de Seguridad e Inmutabilidad */
+.security-status-banner {
+  background: linear-gradient(135deg, #071770 0%, #04105a 100%);
+  border: 1px solid var(--blue-700);
+  border-radius: var(--radius-lg);
+  padding: 18px 22px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow-sm);
+}
+
+.security-status-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.security-icon-shield {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #96b4fa;
+}
+
+.security-icon-shield svg {
+  width: 24px;
+  height: 24px;
+}
+
+.security-status-text h4 {
+  font-size: 0.98rem;
+  font-weight: 700;
+  margin-bottom: 3px;
+  color: #ffffff;
+}
+
+.security-status-text p {
+  font-size: 0.84rem;
+  color: var(--blue-100);
+  line-height: 1.4;
+}
+
+.security-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(96, 136, 245, 0.2);
+  border: 1px solid rgba(150, 180, 250, 0.4);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.security-badge-pill .pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #6088f5;
+  box-shadow: 0 0 8px #6088f5;
+}
+
+/* Insignias de Inmutabilidad */
+.badge-immutable {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background-color: #edf3ff;
+  border: 1px solid #c7d9fd;
+  color: #04105a;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-immutable svg {
+  width: 12px;
+  height: 12px;
+}
+
+.badge-readonly {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Resumen Rápido de Total de la Venta en Modal */
+.sale-calc-box {
+  background-color: var(--blue-50);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sale-calc-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.sale-calc-amount {
+  font-family: var(--font-mono);
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--blue-900);
+}
+
+.field-hint-stock {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+}
+
+.stock-ok {
+  color: #1e44c8;
+  font-weight: 600;
+}
+
+.stock-empty {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* Cuadro Informativo de Seguridad */
+.security-info-card {
+  background-color: var(--bg-surface);
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-top: 18px;
+  display: flex;
+  gap: 12px;
+  font-size: 0.83rem;
+  color: var(--text-secondary);
+}
+
+.security-info-card svg {
+  width: 20px;
+  height: 20px;
+  color: var(--blue-700);
+  flex-shrink: 0;
+  margin-top: 2px;
+}

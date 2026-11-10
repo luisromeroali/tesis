@@ -105,6 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
     localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+    sessionStorage.setItem('rufo_active_user', JSON.stringify(sessionUser));
+    localStorage.setItem('rufo_active_user', JSON.stringify(sessionUser));
   }
 
   /**
@@ -150,14 +152,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (response.ok && data.ok && data.usuario) {
         saveActiveSession(data.usuario);
+        const targetUrl = data.usuario.rol === 'empleado' ? 'empleado.html' : 'admin.html';
+        const roleLabel = data.usuario.rol === 'empleado' ? 'Operador (Empleado)' : 'Administrador';
+
+        // Registro transparente en Bitácora de Auditoría
+        if (window.RufoAudit) {
+          window.RufoAudit.logEvent({
+            modulo: 'Autenticación',
+            accion: 'INICIO_SESION',
+            detalles: `Inicio de sesión exitoso con rol "${data.usuario.rol}" (${data.usuario.nombre_completo})`,
+            user: data.usuario
+          });
+        }
+
         showFeedback(
           'success',
-          `<strong>Bienvenido, ${data.usuario.nombre_completo}:</strong> Accediendo con rol <em>${data.usuario.rol}</em>...`
+          `<strong>Bienvenido, ${data.usuario.nombre_completo}:</strong> Accediendo con rol <em>${roleLabel}</em>...`
         );
         setTimeout(() => {
-          window.location.href = 'admin.html';
+          window.location.href = targetUrl;
         }, 450);
         return;
+      }
+
+      // Registro en Bitácora de Auditoría sobre intento fallido
+      if (window.RufoAudit) {
+        window.RufoAudit.logEvent({
+          modulo: 'Autenticación',
+          accion: 'INTENTO_FALLIDO',
+          detalles: `Intento de acceso fallido con el usuario "${username}" (credenciales no válidas)`,
+          user: { id_usuario: null, usuario: username, rol: 'desconocido' }
+        });
       }
 
       submitBtn.disabled = false;
@@ -174,14 +199,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (account) {
         saveActiveSession(account);
+        const targetUrl = account.rol === 'empleado' ? 'empleado.html' : 'admin.html';
+        const roleLabel = account.rol === 'empleado' ? 'Operador (Empleado)' : 'Administrador';
+
+        // Registro transparente en Bitácora de Auditoría
+        if (window.RufoAudit) {
+          window.RufoAudit.logEvent({
+            modulo: 'Autenticación',
+            accion: 'INICIO_SESION',
+            detalles: `Inicio de sesión exitoso con rol "${account.rol}" (${account.nombre_completo})`,
+            user: account
+          });
+        }
+
         showFeedback(
           'success',
-          `<strong>Bienvenido, ${account.nombre_completo}:</strong> Accediendo en modo local (<em>${account.rol}</em>)...`
+          `<strong>Bienvenido, ${account.nombre_completo}:</strong> Accediendo en modo local (<em>${roleLabel}</em>)...`
         );
         setTimeout(() => {
-          window.location.href = 'admin.html';
+          window.location.href = targetUrl;
         }, 450);
       } else {
+        // Registro en Bitácora de Auditoría sobre intento fallido
+        if (window.RufoAudit) {
+          window.RufoAudit.logEvent({
+            modulo: 'Autenticación',
+            accion: 'INTENTO_FALLIDO',
+            detalles: `Intento de acceso fallido con el usuario "${username}" (credenciales no válidas)`,
+            user: { id_usuario: null, usuario: username, rol: 'desconocido' }
+          });
+        }
+
         submitBtn.disabled = false;
         submitBtn.classList.remove('loading');
         submitBtnText.textContent = 'Ingresar al Sistema';

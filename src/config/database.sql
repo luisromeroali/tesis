@@ -105,7 +105,29 @@ CREATE TABLE IF NOT EXISTS `compras` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
--- 7. Datos Iniciales de Prueba (Refrigeración Rufo 1, C.A.)
+-- 7. Tabla: auditoria
+-- Bitácora de actividad y trazabilidad de operaciones (invisible para el empleado).
+-- Registra qué usuario hizo qué acción, a qué hora y desde qué IP, garantizando
+-- la seguridad y trazabilidad que exige un entorno jerarquizado.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `auditoria` (
+  `id_auditoria` INT AUTO_INCREMENT PRIMARY KEY,
+  `id_usuario` INT DEFAULT NULL,
+  `usuario` VARCHAR(50) NOT NULL,
+  `rol` VARCHAR(30) NOT NULL,
+  `modulo` VARCHAR(50) NOT NULL,
+  `accion` VARCHAR(100) NOT NULL,
+  `detalles` TEXT NOT NULL,
+  `ip_origen` VARCHAR(45) NOT NULL,
+  `fecha_hora` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_auditoria_usuario`
+    FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`)
+    ON DELETE SET NULL
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- 8. Datos Iniciales de Prueba (Refrigeración Rufo 1, C.A.)
 -- ============================================================================
 
 -- Usuarios iniciales
@@ -144,3 +166,16 @@ INSERT INTO `ventas` (`fecha`, `descripcion`, `cantidad_producto`, `monto`, `id_
 ('2026-11-08 10:42:00', 'Venta de compresor con garantía', 3, 285.00, 1, 1),
 ('2026-11-08 11:20:00', 'Venta al detal en mostrador', 6, 111.00, 5, 2),
 ('2026-11-08 11:55:00', 'Venta de cilindro refrigerante', 2, 270.00, 2, 1);
+
+-- Bitácora de Auditoría inicial
+INSERT INTO `auditoria` (`id_usuario`, `usuario`, `rol`, `modulo`, `accion`, `detalles`, `ip_origen`, `fecha_hora`) VALUES
+(1, 'admin', 'administrador', 'Sistema', 'INICIALIZACION_SISTEMA', 'Carga de estructura base de base de datos relacional y catálogo de repuestos', '192.168.1.10', '2026-11-01 08:00:00'),
+(1, 'admin', 'administrador', 'Autenticación', 'INICIO_SESION', 'Inicio de sesión exitoso en estación de gerencia', '192.168.1.10', '2026-11-08 08:30:00'),
+(2, 'empleado', 'empleado', 'Autenticación', 'INICIO_SESION', 'Inicio de sesión de operador en terminal de mostrador', '192.168.1.105', '2026-11-08 09:00:00'),
+(2, 'empleado', 'empleado', 'Ventas', 'REGISTRO_VENTA', 'Venta #1 registrada: 12x Capacitor de Marcha 35 uF ($78.00)', '192.168.1.105', '2026-11-08 09:15:00'),
+(2, 'empleado', 'empleado', 'Ventas', 'REGISTRO_VENTA', 'Venta #2 registrada: 9x Protector Térmico y Relé PTC 1/3 HP ($45.00)', '192.168.1.105', '2026-11-08 10:05:00'),
+(1, 'admin', 'administrador', 'Ventas', 'REGISTRO_VENTA', 'Venta #3 registrada: 3x Compresor Embraco 1/4 HP R-134a ($285.00)', '192.168.1.10', '2026-11-08 10:42:00'),
+(2, 'empleado', 'empleado', 'Ventas', 'REGISTRO_VENTA', 'Venta #4 registrada: 6x Motor Ventilador Evaporador 110V ($111.00)', '192.168.1.105', '2026-11-08 11:20:00'),
+(1, 'admin', 'administrador', 'Ventas', 'REGISTRO_VENTA', 'Venta #5 registrada: 2x Cilindro Gas Refrigerante R-134a ($270.00)', '192.168.1.10', '2026-11-08 11:55:00'),
+(2, 'empleado', 'empleado', 'Seguridad', 'ACCESO_DENEGADO', 'Intento de ingreso no autorizado a la ruta /admin.html bloqueado por directiva de seguridad', '192.168.1.105', '2026-11-08 13:10:00');
+

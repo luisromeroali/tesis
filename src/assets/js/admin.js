@@ -24,6 +24,69 @@ document.addEventListener('DOMContentLoaded', () => {
   const API_URL = getApiUrl();
   let isDbConnected = false;
 
+  // Control de Acceso y Sesión
+  function checkSession() {
+    let activeUser = null;
+    try {
+      const stored = sessionStorage.getItem('rufo_active_user') || localStorage.getItem('rufo_active_user');
+      if (stored) activeUser = JSON.parse(stored);
+    } catch (e) {}
+
+    if (!activeUser) {
+      window.location.href = 'index.html';
+      return null;
+    }
+
+    if (activeUser.rol === 'empleado') {
+      // Registrar intento de acceso indebido en auditoría
+      if (window.RufoAudit) {
+        window.RufoAudit.logEvent({
+          modulo: 'Seguridad',
+          accion: 'ACCESO_DENEGADO',
+          detalles: 'Intento de acceso no autorizado a /admin.html bloqueado por control de acceso',
+          user: activeUser
+        });
+      }
+      window.location.href = 'empleado.html';
+      return null;
+    }
+
+    // Actualizar nombre y avatar en interfaz
+    const adminNameEl = document.querySelector('.admin-name');
+    if (adminNameEl && activeUser.nombre_completo) {
+      adminNameEl.textContent = activeUser.nombre_completo;
+    }
+    const adminAvatarEl = document.querySelector('.admin-avatar');
+    if (adminAvatarEl && activeUser.nombre_completo) {
+      const parts = activeUser.nombre_completo.trim().split(/\s+/);
+      adminAvatarEl.textContent = parts.length > 1 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0].slice(0, 2).toUpperCase();
+    }
+    return activeUser;
+  }
+
+  const currentUser = checkSession();
+  if (!currentUser) return;
+
+  // Manejo de Cierre de Sesión
+  document.querySelectorAll('.logout-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+
+      if (window.RufoAudit) {
+        window.RufoAudit.logEvent({
+          modulo: 'Autenticación',
+          accion: 'CIERRE_SESION',
+          detalles: `Cierre de sesión de administrador (${currentUser.nombre_completo})`,
+          user: currentUser
+        });
+      }
+
+      localStorage.removeItem('rufo_active_user');
+      sessionStorage.removeItem('rufo_active_user');
+      window.location.href = 'index.html';
+    });
+  });
+
   const INITIAL_DB = {
     usuarios: [
       {
@@ -237,7 +300,10 @@ document.addEventListener('DOMContentLoaded', () => {
         descripcion: 'Venta de cilindro refrigerante',
         id_usuario: 1
       }
-    ]
+    ],
+    auditoria: (window.RufoAudit && window.RufoAudit.INITIAL_AUDIT_LOGS)
+      ? JSON.parse(JSON.stringify(window.RufoAudit.INITIAL_AUDIT_LOGS))
+      : []
   };
 
   let db = loadDb();
@@ -246,7 +312,16 @@ document.addEventListener('DOMContentLoaded', () => {
   function loadDb() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed.auditoria)) {
+          parsed.auditoria = (window.RufoAudit && window.RufoAudit.INITIAL_AUDIT_LOGS)
+            ? JSON.parse(JSON.stringify(window.RufoAudit.INITIAL_AUDIT_LOGS))
+            : [];
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        }
+        return parsed;
+      }
     } catch (err) {
       console.error('Error al leer almacenamiento local:', err);
     }
@@ -424,6 +499,10 @@ document.addEventListener('DOMContentLoaded', () => {
     seguridad: {
       title: 'Usuarios y Contraseñas',
       subtitle: 'Administración de usuarios y cambio de contraseñas.'
+    },
+    auditoria: {
+      title: 'Bitácora de Auditoría y Trazabilidad',
+      subtitle: 'Supervisión jerárquica de operaciones, inicios de sesión y direcciones IP de origen.'
     }
   };
 
@@ -454,6 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderProveedoresYCompras();
     renderReportes();
     renderUsuarios();
+    renderAuditoria();
     populateSelects();
   }
 
@@ -833,6 +913,164 @@ document.addEventListener('DOMContentLoaded', () => {
       .join('');
   }
 
+  // 7. BITÁCORA DE AUDITORÍA
+  const searchAuditInput = document.getElementById('searchAuditInput');
+  const filterAuditUserSelect = document.getElementById('filterAuditUserSelect');
+  const filterAuditModuleSelect = document.getElementById('filterAuditModuleSelect');
+  const exportAuditBtn = document.getElementById('exportAuditBtn');
+
+  function renderAuditoria() {
+    if (!Array.isArray(db.auditoria)) {
+      db.auditoria = (window.RufoAudit && window.RufoAudit.INITIAL_AUDIT_LOGS)
+        ? JSON.parse(JSON.stringify(window.RufoAudit.INITIAL_AUDIT_LOGS))
+        : [];
+    }
+
+    const auditList = db.auditoria;
+
+    // Actualizar KPIs
+    const totalCount = auditList.length;
+    const employeeCount = auditList.filter((a) => a.rol === 'empleado' || a.usuario === 'empleado').length;
+    const adminCount = auditList.filter((a) => a.rol === 'administrador' || a.usuario === 'admin').length;
+    const alertsCount = auditList.filter(
+      (a) => a.modulo === 'Seguridad' || a.accion.includes('DENEGADO') || a.accion.includes('FALLIDO')
+    ).length;
+
+    const kpiAuditTotal = document.getElementById('kpiAuditTotal');
+    const kpiAuditEmployee = document.getElementById('kpiAuditEmployee');
+    const kpiAuditAdmin = document.getElementById('kpiAuditAdmin');
+    const kpiAuditAlerts = document.getElementById('kpiAuditAlerts');
+    const navAuditBadge = document.getElementById('navAuditBadge');
+
+    if (kpiAuditTotal) kpiAuditTotal.textContent = totalCount;
+    if (kpiAuditEmployee) kpiAuditEmployee.textContent = employeeCount;
+    if (kpiAuditAdmin) kpiAuditAdmin.textContent = adminCount;
+    if (kpiAuditAlerts) kpiAuditAlerts.textContent = alertsCount;
+    if (navAuditBadge) navAuditBadge.textContent = totalCount;
+
+    // Filtros de tabla
+    const query = (searchAuditInput?.value || '').trim().toLowerCase();
+    const userFilter = filterAuditUserSelect?.value || 'todos';
+    const moduleFilter = filterAuditModuleSelect?.value || 'todos';
+
+    const filtered = auditList.filter((a) => {
+      // Filtro de usuario
+      if (userFilter !== 'todos' && (a.usuario || '').toLowerCase() !== userFilter.toLowerCase()) {
+        return false;
+      }
+      // Filtro de módulo
+      if (moduleFilter !== 'todos' && (a.modulo || '').toLowerCase() !== moduleFilter.toLowerCase()) {
+        return false;
+      }
+      // Filtro de búsqueda textual
+      if (query) {
+        const u = (a.usuario || '').toLowerCase();
+        const r = (a.rol || '').toLowerCase();
+        const m = (a.modulo || '').toLowerCase();
+        const ac = (a.accion || '').toLowerCase();
+        const d = (a.detalles || '').toLowerCase();
+        const ip = (a.ip_origen || '').toLowerCase();
+        const fh = (a.fecha_hora || '').toLowerCase();
+        return u.includes(query) || r.includes(query) || m.includes(query) ||
+               ac.includes(query) || d.includes(query) || ip.includes(query) || fh.includes(query);
+      }
+      return true;
+    });
+
+    const tbody = document.getElementById('auditTableBody');
+    if (!tbody) return;
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align: center; padding: 32px 20px; color: var(--text-muted);">
+            No se encontraron registros de auditoría que coincidan con los filtros aplicados.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = filtered
+      .map((a) => {
+        let moduleClass = 'badge-module-sys';
+        const mod = (a.modulo || '').toLowerCase();
+        if (mod.includes('autent')) moduleClass = 'badge-module-auth';
+        else if (mod.includes('venta')) moduleClass = 'badge-module-sales';
+        else if (mod.includes('invent')) moduleClass = 'badge-module-inv';
+        else if (mod.includes('prov') || mod.includes('compra')) moduleClass = 'badge-module-prov';
+        else if (mod.includes('segur')) moduleClass = 'badge-module-sec';
+
+        const roleBadge = a.rol === 'administrador'
+          ? '<span class="status-badge in-stock" style="font-size: 0.72rem;">Admin</span>'
+          : a.rol === 'empleado'
+          ? '<span class="status-badge out-stock" style="background:#edf3ff; color:#04105a; border-color:#c7d9fd; font-size: 0.72rem;">Empleado</span>'
+          : '<span class="status-badge out-stock" style="font-size: 0.72rem;">Sistema</span>';
+
+        return `
+          <tr>
+            <td class="mono"><strong>#${a.id_auditoria}</strong></td>
+            <td class="mono" style="font-size: 0.82rem; white-space: nowrap;">${a.fecha_hora}</td>
+            <td>
+              <div style="font-weight: 600; color: var(--text-primary);">${a.usuario}</div>
+              ${roleBadge}
+            </td>
+            <td><span class="badge-module ${moduleClass}">${a.modulo}</span></td>
+            <td><span class="action-tag">${a.accion}</span></td>
+            <td style="color: var(--text-secondary); font-size: 0.86rem; max-width: 320px;">${a.detalles}</td>
+            <td>
+              <span class="ip-chip" title="Dirección IP de la estación de origen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect width="20" height="8" x="2" y="2" rx="2" ry="2"/>
+                  <rect width="20" height="8" x="2" y="14" rx="2" ry="2"/>
+                  <line x1="6" x2="6.01" y1="6" y2="6"/>
+                  <line x1="6" x2="6.01" y1="18" y2="18"/>
+                </svg>
+                ${a.ip_origen}
+              </span>
+            </td>
+          </tr>
+        `;
+      })
+      .join('');
+  }
+
+  searchAuditInput?.addEventListener('input', renderAuditoria);
+  filterAuditUserSelect?.addEventListener('change', renderAuditoria);
+  filterAuditModuleSelect?.addEventListener('change', renderAuditoria);
+
+  // Exportar Bitácora a CSV
+  exportAuditBtn?.addEventListener('click', () => {
+    if (!Array.isArray(db.auditoria) || db.auditoria.length === 0) {
+      showToast('No hay registros de auditoría para exportar.');
+      return;
+    }
+
+    const headers = ['ID', 'Fecha y Hora', 'Usuario', 'Rol', 'Modulo', 'Accion', 'Detalles', 'IP Origen'];
+    const rows = db.auditoria.map((a) => [
+      a.id_auditoria,
+      `"${a.fecha_hora}"`,
+      `"${a.usuario}"`,
+      `"${a.rol}"`,
+      `"${a.modulo}"`,
+      `"${a.accion}"`,
+      `"${(a.detalles || '').replace(/"/g, '""')}"`,
+      `"${a.ip_origen}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `bitacora_auditoria_refrigeracion_rufo_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast('Bitácora de auditoría exportada exitosamente.');
+  });
+
   // ==========================================================================
   // Poblar Selectores en Modales
   // ==========================================================================
@@ -960,6 +1198,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const delBtn = e.target.closest('[data-del-prod]');
     if (delBtn) {
       const id = Number(delBtn.dataset.delProd);
+      const prodToDelete = getProductoById(id);
       try {
         const res = await apiRequest('eliminar_producto', { id_producto: id });
         renderAll();
@@ -972,7 +1211,17 @@ document.addEventListener('DOMContentLoaded', () => {
           showToast('Producto eliminado (Modo Local).');
         } else {
           showToast(err.message);
+          return;
         }
+      }
+
+      if (window.RufoAudit) {
+        window.RufoAudit.logEvent({
+          modulo: 'Inventario',
+          accion: 'ELIMINACION_PRODUCTO',
+          detalles: `Repuesto eliminado del inventario: ID #${id} (${prodToDelete ? prodToDelete.nombre : 'Repuesto'})`,
+          user: currentUser
+        });
       }
     }
   });
@@ -1013,7 +1262,17 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Producto guardado (Modo Local).');
       } else {
         showToast(err.message);
+        return;
       }
+    }
+
+    if (window.RufoAudit) {
+      window.RufoAudit.logEvent({
+        modulo: 'Inventario',
+        accion: editId ? 'MODIFICACION_PRODUCTO' : 'CREACION_PRODUCTO',
+        detalles: `${editId ? 'Repuesto modificado' : 'Nuevo repuesto ingresado'}: ${payload.nombre} (${payload.codigo}) con ${payload.cantidad} unidades`,
+        user: currentUser
+      });
     }
   });
 
@@ -1088,7 +1347,17 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Venta registrada (Modo Local).');
       } else {
         showToast(err.message);
+        return;
       }
+    }
+
+    if (window.RufoAudit) {
+      window.RufoAudit.logEvent({
+        modulo: 'Ventas',
+        accion: 'REGISTRO_VENTA',
+        detalles: `Venta registrada: ${cantidad_producto}x ${prod.nombre} (${formatCurrency(prod.precio * cantidad_producto)})`,
+        user: currentUser
+      });
     }
   });
 
@@ -1149,7 +1418,17 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Proveedor guardado (Modo Local).');
       } else {
         showToast(err.message);
+        return;
       }
+    }
+
+    if (window.RufoAudit) {
+      window.RufoAudit.logEvent({
+        modulo: 'Proveedores',
+        accion: editId ? 'MODIFICACION_PROVEEDOR' : 'CREACION_PROVEEDOR',
+        detalles: `Proveedor ${editId ? 'actualizado' : 'registrado'}: ${payload.nombre} (${payload.rif})`,
+        user: currentUser
+      });
     }
   });
 
@@ -1201,7 +1480,18 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast(`Compra registrada (Modo Local): +${cantidad_mercancia} unidades.`);
       } else {
         showToast(err.message);
+        return;
       }
+    }
+
+    if (window.RufoAudit) {
+      const prov = getProveedorById(id_proveedor);
+      window.RufoAudit.logEvent({
+        modulo: 'Compras',
+        accion: 'REGISTRO_COMPRA',
+        detalles: `Compra registrada a proveedor "${prov ? prov.nombre : 'ID ' + id_proveedor}": +${cantidad_mercancia} unds. de ${prod.nombre} (${formatCurrency(monto_compra)})`,
+        user: currentUser
+      });
     }
   });
 
@@ -1270,11 +1560,21 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('Usuario guardado (Modo Local).');
       } else {
         showToast(err.message);
+        return;
       }
+    }
+
+    if (window.RufoAudit) {
+      window.RufoAudit.logEvent({
+        modulo: 'Seguridad',
+        accion: editId ? 'MODIFICACION_USUARIO' : 'CREACION_USUARIO',
+        detalles: `Usuario ${editId ? 'modificado' : 'creado'}: "${payload.usuario}" (Rol: ${payload.rol})`,
+        user: currentUser
+      });
     }
   });
 
-  // Restaurar Datos Iniciales en la Base de Datos MySQL
+  // Restaurar Datos Iniciales en la Base de Datos MySQL o Local
   document.getElementById('resetDemoDataBtn')?.addEventListener('click', async () => {
     try {
       const res = await apiRequest('restaurar_datos');
@@ -1285,6 +1585,15 @@ document.addEventListener('DOMContentLoaded', () => {
       saveDb();
       renderAll();
       showToast('Datos del sistema restaurados localmente.');
+    }
+
+    if (window.RufoAudit) {
+      window.RufoAudit.logEvent({
+        modulo: 'Sistema',
+        accion: 'RESTAURACION_DATOS',
+        detalles: 'Base de datos restaurada a valores de fábrica por el Administrador',
+        user: currentUser
+      });
     }
   });
 
