@@ -1,10 +1,28 @@
 /**
  * SISTEMA WEB PARA LA GESTIÓN ADMINISTRATIVA - REFRIGERACIÓN RUFO 1, C.A.
  * Módulo: Controlador Integral del Panel de Administrador
+ * Conectado a la Base de Datos MySQL / MariaDB (refrigeracion_rufo)
  */
 
 document.addEventListener('DOMContentLoaded', () => {
   const STORAGE_KEY = 'rufo_db_relacional_v2';
+  const SESSION_KEY = 'rufo_usuario_sesion';
+
+  function getApiUrl() {
+    const { protocol, hostname, port, pathname } = window.location;
+    if (
+      (protocol === 'http:' || protocol === 'https:') &&
+      (hostname === 'localhost' || hostname === '127.0.0.1') &&
+      (port === '' || port === '80') &&
+      pathname.toLowerCase().includes('/eunices')
+    ) {
+      return 'src/routes/api.php';
+    }
+    return 'http://localhost/Eunices/src/routes/api.php';
+  }
+
+  const API_URL = getApiUrl();
+  let isDbConnected = false;
 
   const INITIAL_DB = {
     usuarios: [
@@ -239,6 +257,103 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function saveDb() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  }
+
+  function getActiveSessionUser() {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (err) {
+      // Ignorar errores de parseo
+    }
+    return {
+      id_usuario: 1,
+      nombre_completo: 'Administrador General',
+      usuario: 'admin',
+      rol: 'administrador'
+    };
+  }
+
+  function applySessionProfile() {
+    const activeUser = getActiveSessionUser();
+    const nameEl = document.querySelector('.admin-name');
+    const subEl = document.querySelector('.admin-sub');
+    const avatarEl = document.querySelector('.admin-avatar');
+    const roleChip = document.querySelector('.role-chip');
+
+    if (nameEl) nameEl.textContent = activeUser.nombre_completo || 'Administrador General';
+    if (subEl) {
+      subEl.textContent =
+        activeUser.rol === 'administrador' ? 'Control y Acceso Total' : 'Operaciones y Ventas';
+    }
+    if (avatarEl && activeUser.nombre_completo) {
+      const initials = activeUser.nombre_completo
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((w) => w[0].toUpperCase())
+        .join('');
+      avatarEl.textContent = initials || 'US';
+    }
+    if (roleChip) {
+      roleChip.textContent = activeUser.rol === 'administrador' ? 'Administrador' : 'Empleado';
+    }
+  }
+
+  function updateConnectionBadge(connected) {
+    isDbConnected = connected;
+    const badge = document.getElementById('dbStatusBadge');
+    if (!badge) return;
+    if (connected) {
+      badge.className = 'status-badge in-stock';
+      badge.textContent = 'MySQL: refrigeracion_rufo';
+      badge.title = 'Conectado en tiempo real a MariaDB / MySQL (refrigeracion_rufo)';
+    } else {
+      badge.className = 'status-badge low-stock';
+      badge.textContent = 'Modo Local (Cache)';
+      badge.title = 'Operando con respaldo en memoria local';
+    }
+  }
+
+  /**
+   * Petición centralizada hacia la API PHP + PDO (refrigeracion_rufo)
+   */
+  async function apiRequest(action, payload = {}) {
+    const response = await fetch(`${API_URL}?action=${encodeURIComponent(action)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...payload })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.mensaje || 'Error al procesar la solicitud en la base de datos.');
+    }
+    if (data.db) {
+      db = data.db;
+      saveDb();
+    }
+    updateConnectionBadge(true);
+    return data;
+  }
+
+  /**
+   * Carga inicial desde la base de datos MySQL / MariaDB
+   */
+  async function syncWithDatabase() {
+    try {
+      const response = await fetch(`${API_URL}?action=init`);
+      const data = await response.json();
+      if (response.ok && data.ok && data.db) {
+        db = data.db;
+        saveDb();
+        updateConnectionBadge(true);
+        renderAll();
+      } else {
+        updateConnectionBadge(false);
+      }
+    } catch (err) {
+      updateConnectionBadge(false);
+    }
   }
 
   // Consultas de búsqueda interna
@@ -745,8 +860,12 @@ document.addEventListener('DOMContentLoaded', () => {
       .map((p) => `<option value="${p.id_producto}">${p.codigo} - ${p.nombre} (Stock actual: ${p.cantidad})</option>`)
       .join('');
 
+    const activeUser = getActiveSessionUser();
     document.getElementById('saleIdUsuario').innerHTML = db.usuarios
-      .map((u) => `<option value="${u.id_usuario}">${u.nombre_completo}</option>`)
+      .map(
+        (u) =>
+          `<option value="${u.id_usuario}" ${Number(u.id_usuario) === Number(activeUser.id_usuario) ? 'selected' : ''}>${u.nombre_completo}</option>`
+      )
       .join('');
 
     updateSaleMontoPreview();
@@ -809,13 +928,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('productForm').reset();
     document.getElementById('prodIdInput').value = '';
     document.getElementById('productModalTitle').textContent = 'Agregar Producto';
-    const nextCode = String(db.productos.length + 1).padStart(3, '0');
+    const maxNum = db.productos.reduce((m, p) => {
+      const match = String(p.codigo).match(/(\d+)$/);
+      return match ? Math.max(m, parseInt(match[1], 10)) : m;
+    }, db.productos.length);
+    const nextCode = String(maxNum + 1).padStart(3, '0');
     document.getElementById('prodCodigo').value = `REF-${nextCode}`;
     document.getElementById('prodFechaIngreso').value = todayIso();
     openModal('productModal');
   });
 
-  document.getElementById('inventoryTableBody')?.addEventListener('click', (e) => {
+  document.getElementById('inventoryTableBody')?.addEventListener('click', async (e) => {
     const editBtn = e.target.closest('[data-edit-prod]');
     if (editBtn) {
       const p = getProductoById(editBtn.dataset.editProd);
@@ -837,20 +960,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const delBtn = e.target.closest('[data-del-prod]');
     if (delBtn) {
       const id = Number(delBtn.dataset.delProd);
-      db.productos = db.productos.filter((p) => Number(p.id_producto) !== id);
-      saveDb();
-      renderAll();
-      showToast('Producto eliminado del inventario.');
+      try {
+        const res = await apiRequest('eliminar_producto', { id_producto: id });
+        renderAll();
+        showToast(res.mensaje || 'Producto eliminado del inventario.');
+      } catch (err) {
+        if (!isDbConnected) {
+          db.productos = db.productos.filter((p) => Number(p.id_producto) !== id);
+          saveDb();
+          renderAll();
+          showToast('Producto eliminado (Modo Local).');
+        } else {
+          showToast(err.message);
+        }
+      }
     }
   });
 
-  document.getElementById('productForm')?.addEventListener('submit', (e) => {
+  document.getElementById('productForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const editId = document.getElementById('prodIdInput').value;
-    const maxId = db.productos.reduce((m, p) => Math.max(m, Number(p.id_producto)), 0);
-
-    const record = {
-      id_producto: editId ? Number(editId) : maxId + 1,
+    const payload = {
+      id_producto: editId ? Number(editId) : null,
       codigo: document.getElementById('prodCodigo').value.trim().toUpperCase(),
       nombre: document.getElementById('prodNombre').value.trim(),
       categoria: document.getElementById('prodCategoria').value,
@@ -861,18 +992,29 @@ document.addEventListener('DOMContentLoaded', () => {
       id_proveedor: parseInt(document.getElementById('prodIdProveedor').value, 10)
     };
 
-    if (editId) {
-      const idx = db.productos.findIndex((p) => Number(p.id_producto) === Number(editId));
-      if (idx !== -1) db.productos[idx] = record;
-      showToast('Producto actualizado correctamente.');
-    } else {
-      db.productos.push(record);
-      showToast('Producto agregado al inventario.');
+    try {
+      const res = await apiRequest('guardar_producto', payload);
+      closeModal('productModal');
+      renderAll();
+      showToast(res.mensaje);
+    } catch (err) {
+      if (!isDbConnected) {
+        const maxId = db.productos.reduce((m, p) => Math.max(m, Number(p.id_producto)), 0);
+        const record = { ...payload, id_producto: editId ? Number(editId) : maxId + 1 };
+        if (editId) {
+          const idx = db.productos.findIndex((p) => Number(p.id_producto) === Number(editId));
+          if (idx !== -1) db.productos[idx] = record;
+        } else {
+          db.productos.push(record);
+        }
+        saveDb();
+        closeModal('productModal');
+        renderAll();
+        showToast('Producto guardado (Modo Local).');
+      } else {
+        showToast(err.message);
+      }
     }
-
-    saveDb();
-    closeModal('productModal');
-    renderAll();
   });
 
   // --- Ventas ---
@@ -900,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('saleModal');
   });
 
-  document.getElementById('saleForm')?.addEventListener('submit', (e) => {
+  document.getElementById('saleForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const id_producto = parseInt(document.getElementById('saleIdProducto').value, 10);
     const cantidad_producto = parseInt(document.getElementById('saleCantidadProducto').value, 10) || 0;
@@ -915,26 +1057,39 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    prod.cantidad -= cantidad_producto;
-
-    const maxId = db.ventas.reduce((m, v) => Math.max(m, Number(v.id_venta)), 0);
-    const now = new Date();
-    const fecha = `${now.toISOString().split('T')[0]} ${now.toTimeString().slice(0, 5)}`;
-
-    db.ventas.unshift({
-      id_venta: maxId + 1,
-      fecha,
-      id_producto,
-      cantidad_producto,
-      monto: Number((prod.precio * cantidad_producto).toFixed(2)),
-      descripcion,
-      id_usuario
-    });
-
-    saveDb();
-    closeModal('saleModal');
-    renderAll();
-    showToast('Venta registrada exitosamente.');
+    try {
+      const res = await apiRequest('registrar_venta', {
+        id_producto,
+        cantidad_producto,
+        descripcion,
+        id_usuario
+      });
+      closeModal('saleModal');
+      renderAll();
+      showToast(res.mensaje);
+    } catch (err) {
+      if (!isDbConnected) {
+        prod.cantidad -= cantidad_producto;
+        const maxId = db.ventas.reduce((m, v) => Math.max(m, Number(v.id_venta)), 0);
+        const now = new Date();
+        const fecha = `${now.toISOString().split('T')[0]} ${now.toTimeString().slice(0, 5)}`;
+        db.ventas.unshift({
+          id_venta: maxId + 1,
+          fecha,
+          id_producto,
+          cantidad_producto,
+          monto: Number((prod.precio * cantidad_producto).toFixed(2)),
+          descripcion,
+          id_usuario
+        });
+        saveDb();
+        closeModal('saleModal');
+        renderAll();
+        showToast('Venta registrada (Modo Local).');
+      } else {
+        showToast(err.message);
+      }
+    }
   });
 
   // --- Proveedores ---
@@ -961,13 +1116,11 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('supplierModal');
   });
 
-  document.getElementById('supplierForm')?.addEventListener('submit', (e) => {
+  document.getElementById('supplierForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const editId = document.getElementById('supIdInput').value;
-    const maxId = db.proveedores.reduce((m, s) => Math.max(m, Number(s.id_proveedor)), 0);
-
-    const record = {
-      id_proveedor: editId ? Number(editId) : maxId + 1,
+    const payload = {
+      id_proveedor: editId ? Number(editId) : null,
       rif: document.getElementById('supRif').value.trim().toUpperCase(),
       nombre: document.getElementById('supNombre').value.trim(),
       ubicacion: document.getElementById('supUbicacion').value.trim(),
@@ -975,18 +1128,29 @@ document.addEventListener('DOMContentLoaded', () => {
       correo: document.getElementById('supCorreo').value.trim()
     };
 
-    if (editId) {
-      const idx = db.proveedores.findIndex((s) => Number(s.id_proveedor) === Number(editId));
-      if (idx !== -1) db.proveedores[idx] = record;
-      showToast('Proveedor actualizado correctamente.');
-    } else {
-      db.proveedores.push(record);
-      showToast('Proveedor registrado correctamente.');
+    try {
+      const res = await apiRequest('guardar_proveedor', payload);
+      closeModal('supplierModal');
+      renderAll();
+      showToast(res.mensaje);
+    } catch (err) {
+      if (!isDbConnected) {
+        const maxId = db.proveedores.reduce((m, s) => Math.max(m, Number(s.id_proveedor)), 0);
+        const record = { ...payload, id_proveedor: editId ? Number(editId) : maxId + 1 };
+        if (editId) {
+          const idx = db.proveedores.findIndex((s) => Number(s.id_proveedor) === Number(editId));
+          if (idx !== -1) db.proveedores[idx] = record;
+        } else {
+          db.proveedores.push(record);
+        }
+        saveDb();
+        closeModal('supplierModal');
+        renderAll();
+        showToast('Proveedor guardado (Modo Local).');
+      } else {
+        showToast(err.message);
+      }
     }
-
-    saveDb();
-    closeModal('supplierModal');
-    renderAll();
   });
 
   // --- Compras ---
@@ -996,7 +1160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('purchaseModal');
   });
 
-  document.getElementById('purchaseForm')?.addEventListener('submit', (e) => {
+  document.getElementById('purchaseForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fecha_compra = document.getElementById('purFechaCompra').value;
     const id_proveedor = parseInt(document.getElementById('purIdProveedor').value, 10);
@@ -1007,27 +1171,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const prod = getProductoById(id_producto);
     if (!prod || cantidad_mercancia <= 0) return;
 
-    prod.cantidad += cantidad_mercancia;
-    prod.fecha_ingreso = fecha_compra;
-
-    const maxId = db.compras.reduce((m, c) => Math.max(m, Number(c.id_compra)), 0);
-    db.compras.unshift({
-      id_compra: maxId + 1,
-      fecha_compra,
-      id_proveedor,
-      id_producto,
-      cantidad_mercancia,
-      monto_compra
-    });
-
-    saveDb();
-    closeModal('purchaseModal');
-    renderAll();
-    showToast(`Compra registrada: +${cantidad_mercancia} unidades agregadas al inventario.`);
+    try {
+      const res = await apiRequest('registrar_compra', {
+        fecha_compra,
+        id_proveedor,
+        id_producto,
+        cantidad_mercancia,
+        monto_compra
+      });
+      closeModal('purchaseModal');
+      renderAll();
+      showToast(res.mensaje);
+    } catch (err) {
+      if (!isDbConnected) {
+        prod.cantidad += cantidad_mercancia;
+        prod.fecha_ingreso = fecha_compra;
+        const maxId = db.compras.reduce((m, c) => Math.max(m, Number(c.id_compra)), 0);
+        db.compras.unshift({
+          id_compra: maxId + 1,
+          fecha_compra,
+          id_proveedor,
+          id_producto,
+          cantidad_mercancia,
+          monto_compra
+        });
+        saveDb();
+        closeModal('purchaseModal');
+        renderAll();
+        showToast(`Compra registrada (Modo Local): +${cantidad_mercancia} unidades.`);
+      } else {
+        showToast(err.message);
+      }
+    }
   });
 
   // --- Usuarios ---
   document.getElementById('openNewUserModalBtn')?.addEventListener('click', () => {
+    const activeUser = getActiveSessionUser();
+    if (activeUser.rol !== 'administrador') {
+      showToast('Restricción de seguridad: solo el Administrador puede gestionar usuarios.');
+      return;
+    }
     document.getElementById('userForm').reset();
     document.getElementById('userIdInput').value = '';
     document.getElementById('userModalTitle').textContent = 'Nuevo Usuario';
@@ -1037,6 +1221,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('securityUsersTableBody')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-edit-user]');
     if (!btn) return;
+    const activeUser = getActiveSessionUser();
+    if (activeUser.rol !== 'administrador') {
+      showToast('Restricción de seguridad: solo el Administrador puede cambiar contraseñas.');
+      return;
+    }
     const usr = getUsuarioById(btn.dataset.editUser);
     if (!usr) return;
 
@@ -1049,40 +1238,57 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('userModal');
   });
 
-  document.getElementById('userForm')?.addEventListener('submit', (e) => {
+  document.getElementById('userForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const editId = document.getElementById('userIdInput').value;
-    const maxId = db.usuarios.reduce((m, u) => Math.max(m, Number(u.id_usuario)), 0);
-
-    const record = {
-      id_usuario: editId ? Number(editId) : maxId + 1,
+    const payload = {
+      id_usuario: editId ? Number(editId) : null,
       nombre_completo: document.getElementById('userNombreCompleto').value.trim(),
       usuario: document.getElementById('userUsuario').value.trim().toLowerCase(),
       contrasena: document.getElementById('userContrasena').value.trim(),
       rol: document.getElementById('userRol').value
     };
 
-    if (editId) {
-      const idx = db.usuarios.findIndex((u) => Number(u.id_usuario) === Number(editId));
-      if (idx !== -1) db.usuarios[idx] = record;
-      showToast('Datos del usuario actualizados.');
-    } else {
-      db.usuarios.push(record);
-      showToast('Nuevo usuario registrado.');
+    try {
+      const res = await apiRequest('guardar_usuario', payload);
+      closeModal('userModal');
+      renderAll();
+      showToast(res.mensaje);
+    } catch (err) {
+      if (!isDbConnected) {
+        const maxId = db.usuarios.reduce((m, u) => Math.max(m, Number(u.id_usuario)), 0);
+        const record = { ...payload, id_usuario: editId ? Number(editId) : maxId + 1 };
+        if (editId) {
+          const idx = db.usuarios.findIndex((u) => Number(u.id_usuario) === Number(editId));
+          if (idx !== -1) db.usuarios[idx] = record;
+        } else {
+          db.usuarios.push(record);
+        }
+        saveDb();
+        closeModal('userModal');
+        renderAll();
+        showToast('Usuario guardado (Modo Local).');
+      } else {
+        showToast(err.message);
+      }
     }
-
-    saveDb();
-    closeModal('userModal');
-    renderAll();
   });
 
-  // Restaurar Datos Iniciales
-  document.getElementById('resetDemoDataBtn')?.addEventListener('click', () => {
-    db = JSON.parse(JSON.stringify(INITIAL_DB));
-    saveDb();
-    renderAll();
-    showToast('Datos del sistema restaurados.');
+  // Restaurar Datos Iniciales en la Base de Datos MySQL
+  document.getElementById('resetDemoDataBtn')?.addEventListener('click', async () => {
+    try {
+      const res = await apiRequest('restaurar_datos');
+      renderAll();
+      showToast(res.mensaje);
+    } catch (err) {
+      db = JSON.parse(JSON.stringify(INITIAL_DB));
+      saveDb();
+      renderAll();
+      showToast('Datos del sistema restaurados localmente.');
+    }
   });
 
+  applySessionProfile();
   renderAll();
+  syncWithDatabase();
 });

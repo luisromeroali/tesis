@@ -1,11 +1,27 @@
 /**
  * SISTEMA WEB PARA LA GESTIÓN ADMINISTRATIVA - REFRIGERACIÓN RUFO 1, C.A.
  * Módulo: Controlador de Interfaz y Autenticación (Login)
- * Conectado a la Entidad USUARIOS (id_usuario, nombre_completo, usuario, contrasena, rol)
+ * Conectado a la Base de Datos MySQL / MariaDB (refrigeracion_rufo -> tabla usuarios)
  */
 
 document.addEventListener('DOMContentLoaded', () => {
   const STORAGE_KEY = 'rufo_db_relacional_v2';
+  const SESSION_KEY = 'rufo_usuario_sesion';
+
+  function getApiUrl() {
+    const { protocol, hostname, port, pathname } = window.location;
+    if (
+      (protocol === 'http:' || protocol === 'https:') &&
+      (hostname === 'localhost' || hostname === '127.0.0.1') &&
+      (port === '' || port === '80') &&
+      pathname.toLowerCase().includes('/eunices')
+    ) {
+      return 'src/routes/api.php';
+    }
+    return 'http://localhost/Eunices/src/routes/api.php';
+  }
+
+  const API_URL = getApiUrl();
 
   const loginForm = document.getElementById('loginForm');
   const usernameInput = document.getElementById('username');
@@ -23,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const securityModalBackdrop = document.getElementById('securityModalBackdrop');
   const closeSecurityModalBtn = document.getElementById('closeSecurityModalBtn');
 
-  function getUsuariosList() {
+  function getFallbackUsuariosList() {
     const defaultUsuarios = [
       {
         id_usuario: 1,
@@ -80,10 +96,21 @@ document.addEventListener('DOMContentLoaded', () => {
   usernameInput.addEventListener('input', hideFeedback);
   passwordInput.addEventListener('input', hideFeedback);
 
+  function saveActiveSession(account) {
+    const sessionUser = {
+      id_usuario: account.id_usuario,
+      nombre_completo: account.nombre_completo,
+      usuario: account.usuario,
+      rol: account.rol
+    };
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+  }
+
   /**
-   * Manejo del envío del formulario de Login validando contra la entidad USUARIOS
+   * Manejo del envío del formulario de Login validando contra la base de datos MySQL (usuarios)
    */
-  loginForm.addEventListener('submit', (e) => {
+  loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideFeedback();
 
@@ -106,22 +133,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
     submitBtn.disabled = true;
     submitBtn.classList.add('loading');
-    submitBtnText.textContent = 'Verificando...';
+    submitBtnText.textContent = 'Verificando en BD...';
 
-    setTimeout(() => {
-      const usuarios = getUsuariosList();
+    try {
+      const response = await fetch(`${API_URL}?action=login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'login',
+          usuario: username,
+          contrasena: password
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.ok && data.usuario) {
+        saveActiveSession(data.usuario);
+        showFeedback(
+          'success',
+          `<strong>Bienvenido, ${data.usuario.nombre_completo}:</strong> Accediendo con rol <em>${data.usuario.rol}</em>...`
+        );
+        setTimeout(() => {
+          window.location.href = 'admin.html';
+        }, 450);
+        return;
+      }
+
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('loading');
+      submitBtnText.textContent = 'Ingresar al Sistema';
+      passwordInput.classList.add('input-error');
+      showFeedback('error', data.mensaje || 'Usuario o contraseña incorrectos.');
+    } catch (networkErr) {
+      // Fallback local si el servidor Apache/XAMPP no está accesible
+      const usuarios = getFallbackUsuariosList();
       const account = usuarios.find(
         (u) => u.usuario.toLowerCase() === username && u.contrasena === password
       );
 
       if (account) {
+        saveActiveSession(account);
         showFeedback(
           'success',
-          `<strong>Bienvenido, ${account.nombre_completo}:</strong> Accediendo con rol <em>${account.rol}</em>...`
+          `<strong>Bienvenido, ${account.nombre_completo}:</strong> Accediendo en modo local (<em>${account.rol}</em>)...`
         );
         setTimeout(() => {
           window.location.href = 'admin.html';
-        }, 500);
+        }, 450);
       } else {
         submitBtn.disabled = false;
         submitBtn.classList.remove('loading');
@@ -129,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
         passwordInput.classList.add('input-error');
         showFeedback('error', 'Usuario o contraseña incorrectos.');
       }
-    }, 450);
+    }
   });
 
   /**
