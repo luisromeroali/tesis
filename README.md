@@ -25,7 +25,7 @@ Eunices/
 
 ## 🚀 Repositorio
 
-- **GitHub Remote:** `https://github.com/Fortunesyndle/Eunices.git`
+- **GitHub Remote:** `https://github.com/luisromeroali/tesis.git`
 - **Rama principal:** `main`
 
 ## 🛠️ Primeros Pasos
